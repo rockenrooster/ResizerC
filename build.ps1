@@ -115,6 +115,14 @@ $configureArgs += @(
     "-DRESIZERC_GITHUB_REPO=$GitHubRepo"
 )
 
+$toolchain = Join-Path $PSScriptRoot "vcpkg\scripts\buildsystems\vcpkg.cmake"
+if (Test-Path $toolchain) {
+    $configureArgs += @(
+        "-DCMAKE_TOOLCHAIN_FILE=$toolchain",
+        "-DVCPKG_TARGET_TRIPLET=x64-windows-static"
+    )
+}
+
 & $cmake @configureArgs
 if ($LASTEXITCODE -ne 0) { throw "CMake configure failed." }
 
