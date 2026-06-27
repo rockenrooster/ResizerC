@@ -3,6 +3,7 @@ param(
     [string]$Version,
 
     [string]$Message,
+    [switch]$NoUpx,
     [switch]$Upx
 )
 
@@ -121,6 +122,9 @@ $buildArgs = @{
 }
 if ($Upx) {
     $buildArgs.Upx = $true
+}
+if ($NoUpx) {
+    $buildArgs.NoUpx = $true
 }
 & (Join-Path $PSScriptRoot "build.ps1") @buildArgs
 

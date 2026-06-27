@@ -5,6 +5,7 @@ param(
     [switch]$NoIncrement,
     [string]$GitHubOwner,
     [string]$GitHubRepo,
+    [switch]$NoUpx,
     [switch]$Upx
 )
 
@@ -66,6 +67,16 @@ function Get-GitHubRemote {
     }
 
     return $null
+}
+
+function Get-UpxPath {
+    $localUpx = Join-Path $PSScriptRoot "upx.exe"
+    if (Test-Path $localUpx) { return $localUpx }
+
+    $cmd = Get-Command upx -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+
+    throw "UPX not found. Install UPX or pass -NoUpx."
 }
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
@@ -137,11 +148,8 @@ if (!(Test-Path $builtExe)) {
 New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
 Copy-Item $builtExe $artifactExe -Force
 
-if ($Upx) {
-    $upxPath = Join-Path $PSScriptRoot "upx.exe"
-    if (!(Test-Path $upxPath)) {
-        throw "upx.exe not found."
-    }
+if (!$NoUpx) {
+    $upxPath = Get-UpxPath
     & $upxPath -3 $artifactExe
     if ($LASTEXITCODE -ne 0) { throw "UPX failed." }
 }

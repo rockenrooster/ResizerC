@@ -30,6 +30,10 @@ jobs:
           Invoke-WebRequest $url -OutFile vips.zip
           Expand-Archive vips.zip -DestinationPath .
 
+      - name: Install UPX
+        shell: pwsh
+        run: choco install upx -y --no-progress
+
       - name: Build
         shell: pwsh
         run: |

@@ -77,6 +77,8 @@ Or use the local script:
 .\build.ps1 -NoIncrement
 ```
 
+UPX compression is enabled by default. Use `.\build.ps1 -NoIncrement -NoUpx` for an uncompressed local build.
+
 ## GitHub Releases
 
 This repo includes `.github/workflows/release.yml`. Push a version tag and GitHub Actions will build `ResizerC.exe` and upload it to that release.
