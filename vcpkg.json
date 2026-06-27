@@ -1,0 +1,11 @@
+{
+  "name": "resizerc",
+  "version-string": "1.0.1",
+  "dependencies": [
+    "zlib",
+    "libjpeg-turbo",
+    "libpng",
+    "libwebp",
+    "tiff"
+  ]
+}

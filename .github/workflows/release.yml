@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install vcpkg dependencies
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://github.com/microsoft/vcpkg vcpkg
+          .\vcpkg\bootstrap-vcpkg.bat
+          .\vcpkg\vcpkg.exe install --triplet x64-windows-static
+
+      - name: Download libvips
+        shell: pwsh
+        run: |
+          $version = "8.18.0"
+          $url = "https://github.com/libvips/build-win64-mxe/releases/download/v$version/vips-dev-w64-all-$version.zip"
+          Invoke-WebRequest $url -OutFile vips.zip
+          Expand-Archive vips.zip -DestinationPath .
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          .\build.ps1 -Version $version -NoIncrement `
+            -GitHubOwner "${{ github.repository_owner }}" `
+            -GitHubRepo "${{ github.event.repository.name }}"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item artifacts\ResizerC.exe dist\ResizerC.exe
+
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag dist\ResizerC.exe --clobber
+          } else {
+            gh release create $tag dist\ResizerC.exe --title $tag --generate-notes
+          }
