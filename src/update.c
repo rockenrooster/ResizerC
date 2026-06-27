@@ -267,6 +267,14 @@ BOOL update_check_automatic(HWND hwnd_parent) {
     if (!compare_versions(APP_VERSION, latest_tag)) return FALSE;
     if (!json_get_exe_asset_url(response, download_url, sizeof(download_url)/sizeof(wchar_t))) return FALSE;
 
+    wchar_t msg[512];
+    swprintf(msg, 512,
+             L"A new version (%s) is available.\n\nCurrent version: %s\n\nDownload, install, and relaunch now?",
+             latest_tag, APP_VERSION);
+    if (MessageBoxW(hwnd_parent, msg, L"Update Available", MB_YESNO | MB_ICONINFORMATION) != IDYES) {
+        return FALSE;
+    }
+
     if (!GetModuleFileNameW(NULL, exe_path, MAX_PATH_LEN)) return FALSE;
     wcscpy_s(update_path, sizeof(update_path)/sizeof(wchar_t), exe_path);
     wcscat_s(update_path, sizeof(update_path)/sizeof(wchar_t), L".update.exe");

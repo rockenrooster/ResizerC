@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-set(RESIZERC_VERSION "1.0.6" CACHE STRING "Application version")
+set(RESIZERC_VERSION "1.0.7" CACHE STRING "Application version")
 set(RESIZERC_GITHUB_OWNER "rockenrooster" CACHE STRING "GitHub owner used by update checks")
 set(RESIZERC_GITHUB_REPO "ResizerC" CACHE STRING "GitHub repository used by update checks")
 project(ResizerC VERSION ${RESIZERC_VERSION} LANGUAGES C)
