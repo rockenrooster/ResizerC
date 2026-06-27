@@ -235,18 +235,36 @@ BOOL update_download_and_install(HWND hwnd_parent) {
 
 static BOOL relaunch_with_update(HWND hwnd_parent, const wchar_t *download_path) {
     wchar_t exe_path[MAX_PATH_LEN];
-    wchar_t cmd[32768];
+    wchar_t script_path[MAX_PATH_LEN];
+    wchar_t temp_dir[MAX_PATH_LEN];
 
     if (!GetModuleFileNameW(NULL, exe_path, MAX_PATH_LEN)) return FALSE;
+    if (!GetTempPathW(MAX_PATH_LEN, temp_dir)) return FALSE;
+    swprintf(script_path, sizeof(script_path)/sizeof(wchar_t), L"%sResizerC_update_%lu.cmd", temp_dir, GetCurrentProcessId());
 
     DWORD pid = GetCurrentProcessId();
-    swprintf(cmd, sizeof(cmd)/sizeof(wchar_t),
-             L"/c timeout /t 1 /nobreak >nul & "
-             L":wait & tasklist /fi \"PID eq %lu\" | find \"%lu\" >nul && (timeout /t 1 /nobreak >nul & goto wait) & "
-             L"move /y \"%s\" \"%s\" >nul & start \"\" \"%s\"",
-             pid, pid, download_path, exe_path, exe_path);
+    FILE *script = _wfopen(script_path, L"w");
+    if (!script) return FALSE;
+    fwprintf(script,
+             L"@echo off\n"
+             L"setlocal\n"
+             L"set \"pid=%lu\"\n"
+             L"set \"src=%s\"\n"
+             L"set \"dst=%s\"\n"
+             L":wait\n"
+             L"tasklist /fi \"PID eq %%pid%%\" /fo csv /nh | findstr /i \"%%pid%%\" >nul\n"
+             L"if not errorlevel 1 (\n"
+             L"  timeout /t 1 /nobreak >nul\n"
+             L"  goto wait\n"
+             L")\n"
+             L"move /y \"%%src%%\" \"%%dst%%\" >nul\n"
+             L"if errorlevel 1 exit /b 1\n"
+             L"start \"\" \"%%dst%%\"\n"
+             L"del \"%%~f0\"\n",
+             pid, download_path, exe_path);
+    fclose(script);
 
-    HINSTANCE result = ShellExecuteW(hwnd_parent, L"open", L"cmd.exe", cmd, NULL, SW_HIDE);
+    HINSTANCE result = ShellExecuteW(hwnd_parent, L"open", script_path, NULL, temp_dir, SW_HIDE);
     if ((INT_PTR)result <= 32) return FALSE;
 
     PostMessageW(hwnd_parent, WM_CLOSE, 0, 0);
