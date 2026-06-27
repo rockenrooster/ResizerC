@@ -1,6 +1,6 @@
 {
   "name": "resizerc",
-  "version-string": "1.0.7",
+  "version-string": "1.0.8",
   "dependencies": [
     "zlib",
     "libjpeg-turbo",
