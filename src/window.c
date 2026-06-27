@@ -71,8 +71,6 @@ static void window_init_menu(HWND hwnd) {
     HMENU menu = CreateMenu();
     HMENU help = CreatePopupMenu();
 
-    AppendMenuW(help, MF_STRING, ID_HELP_CHECK_UPDATES, L"Check for updates");
-    AppendMenuW(help, MF_SEPARATOR, 0, NULL);
     AppendMenuW(help, MF_STRING, ID_HELP_ABOUT, L"About");
     AppendMenuW(menu, MF_POPUP, (UINT_PTR)help, L"Help");
     SetMenu(hwnd, menu);
@@ -775,10 +773,6 @@ static LRESULT handle_command(AppState *state, WORD cmd, HWND hwnd) {
 
         case IDC_LOGGING_CHECK:
             state->enable_logging = Button_GetCheck(state->hLoggingCheck) == BST_CHECKED;
-            break;
-
-        case ID_HELP_CHECK_UPDATES:
-            update_check(hwnd);
             break;
 
         case ID_HELP_ABOUT: {

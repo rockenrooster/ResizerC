@@ -6,6 +6,9 @@
 // Check for updates
 BOOL update_check(HWND hwnd_parent);
 
+// Silent startup update check
+BOOL update_check_automatic(HWND hwnd_parent);
+
 // Download and install update
 BOOL update_download_and_install(HWND hwnd_parent);
 

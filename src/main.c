@@ -4,10 +4,16 @@
 #include "utils.h"
 #include "image.h"
 #include "dll_loader.h"
+#include "update.h"
 #include <commctrl.h>
 
 // Global application state
 static AppState g_state = {0};
+
+static DWORD WINAPI auto_update_thread(LPVOID param) {
+    update_check_automatic((HWND)param);
+    return 0;
+}
 
 int WINAPI wWinMain(HINSTANCE hinstance, HINSTANCE hprevinstance, LPWSTR cmdline, int cmdshow) {
     (void)hprevinstance;
@@ -96,6 +102,9 @@ int WINAPI wWinMain(HINSTANCE hinstance, HINSTANCE hprevinstance, LPWSTR cmdline
     // Show window
     ShowWindow(hwnd, cmdshow);
     UpdateWindow(hwnd);
+
+    HANDLE hUpdateThread = CreateThread(NULL, 0, auto_update_thread, hwnd, 0, NULL);
+    if (hUpdateThread) CloseHandle(hUpdateThread);
 
     // Message loop
     MSG msg;

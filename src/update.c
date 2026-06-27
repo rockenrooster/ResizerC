@@ -70,6 +70,49 @@ cleanup:
     return result;
 }
 
+static BOOL http_download_file(const wchar_t *url, const wchar_t *path) {
+    HINTERNET hInternet = NULL;
+    HINTERNET hUrl = NULL;
+    HANDLE hFile = INVALID_HANDLE_VALUE;
+    BOOL result = FALSE;
+
+    hInternet = InternetOpenW(UPDATE_USER_AGENT, INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+    if (!hInternet) goto cleanup;
+
+    hUrl = InternetOpenUrlW(hInternet, url, NULL, 0,
+                            INTERNET_FLAG_RELOAD | INTERNET_FLAG_SECURE | INTERNET_FLAG_NO_CACHE_WRITE, 0);
+    if (!hUrl) goto cleanup;
+
+    DWORD status = 0;
+    DWORD status_size = sizeof(status);
+    if (HttpQueryInfoW(hUrl, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER,
+                       &status, &status_size, NULL) && (status < 200 || status >= 300)) {
+        goto cleanup;
+    }
+
+    hFile = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) goto cleanup;
+
+    char buffer[65536];
+    DWORD bytes_read = 0;
+    while (InternetReadFile(hUrl, buffer, sizeof(buffer), &bytes_read) && bytes_read > 0) {
+        DWORD bytes_written = 0;
+        if (!WriteFile(hFile, buffer, bytes_read, &bytes_written, NULL) || bytes_written != bytes_read) {
+            goto cleanup;
+        }
+    }
+
+    result = TRUE;
+
+cleanup:
+    if (hFile != INVALID_HANDLE_VALUE) CloseHandle(hFile);
+    if (!result) DeleteFileW(path);
+    if (hUrl) InternetCloseHandle(hUrl);
+    if (hInternet) InternetCloseHandle(hInternet);
+
+    return result;
+}
+
 static BOOL github_updates_configured(void) {
     return GITHUB_OWNER[0] != L'\0' && GITHUB_REPO[0] != L'\0' && wcscmp(GITHUB_OWNER, L"OWNER") != 0;
 }
@@ -91,6 +134,28 @@ static BOOL json_get_string(const wchar_t *json, const wchar_t *key, wchar_t *ou
     }
     out[i] = L'\0';
     return i > 0;
+}
+
+static BOOL json_get_exe_asset_url(const wchar_t *json, wchar_t *out, size_t out_size) {
+    const wchar_t *p = json;
+
+    while ((p = wcsstr(p, L"\"browser_download_url\"")) != NULL) {
+        wchar_t url[2048];
+        if (json_get_string(p, L"\"browser_download_url\"", url, sizeof(url)/sizeof(wchar_t))) {
+            wchar_t lower[2048];
+            wcscpy_s(lower, sizeof(lower)/sizeof(wchar_t), url);
+            for (wchar_t *c = lower; *c; c++) {
+                if (*c >= L'A' && *c <= L'Z') *c = *c - L'A' + L'a';
+            }
+            if (wcsstr(lower, L".exe")) {
+                wcscpy_s(out, out_size, url);
+                return TRUE;
+            }
+        }
+        p++;
+    }
+
+    return FALSE;
 }
 
 static BOOL parse_version(const wchar_t *version, int *major, int *minor, int *patch) {
@@ -166,6 +231,48 @@ BOOL update_download_and_install(HWND hwnd_parent) {
     }
 
     return TRUE;
+}
+
+static BOOL relaunch_with_update(HWND hwnd_parent, const wchar_t *download_path) {
+    wchar_t exe_path[MAX_PATH_LEN];
+    wchar_t cmd[32768];
+
+    if (!GetModuleFileNameW(NULL, exe_path, MAX_PATH_LEN)) return FALSE;
+
+    DWORD pid = GetCurrentProcessId();
+    swprintf(cmd, sizeof(cmd)/sizeof(wchar_t),
+             L"/c timeout /t 1 /nobreak >nul & "
+             L":wait & tasklist /fi \"PID eq %lu\" | find \"%lu\" >nul && (timeout /t 1 /nobreak >nul & goto wait) & "
+             L"move /y \"%s\" \"%s\" >nul & start \"\" \"%s\"",
+             pid, pid, download_path, exe_path, exe_path);
+
+    HINSTANCE result = ShellExecuteW(hwnd_parent, L"open", L"cmd.exe", cmd, NULL, SW_HIDE);
+    if ((INT_PTR)result <= 32) return FALSE;
+
+    PostMessageW(hwnd_parent, WM_CLOSE, 0, 0);
+    return TRUE;
+}
+
+BOOL update_check_automatic(HWND hwnd_parent) {
+    if (!github_updates_configured()) return FALSE;
+
+    wchar_t response[65536];
+    wchar_t latest_tag[64];
+    wchar_t download_url[2048];
+    wchar_t exe_path[MAX_PATH_LEN];
+    wchar_t update_path[MAX_PATH_LEN];
+
+    if (!http_get(UPDATE_CHECK_URL, response, sizeof(response)/sizeof(wchar_t))) return FALSE;
+    if (!json_get_string(response, L"\"tag_name\"", latest_tag, sizeof(latest_tag)/sizeof(wchar_t))) return FALSE;
+    if (!compare_versions(APP_VERSION, latest_tag)) return FALSE;
+    if (!json_get_exe_asset_url(response, download_url, sizeof(download_url)/sizeof(wchar_t))) return FALSE;
+
+    if (!GetModuleFileNameW(NULL, exe_path, MAX_PATH_LEN)) return FALSE;
+    wcscpy_s(update_path, sizeof(update_path)/sizeof(wchar_t), exe_path);
+    wcscat_s(update_path, sizeof(update_path)/sizeof(wchar_t), L".update.exe");
+
+    if (!http_download_file(download_url, update_path)) return FALSE;
+    return relaunch_with_update(hwnd_parent, update_path);
 }
 
 void get_update_url(wchar_t *url, size_t url_size) {
